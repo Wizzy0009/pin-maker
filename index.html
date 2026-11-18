@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pin Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@800&family=Montserrat:wght@800&family=Oswald:wght@700&family=Bebas+Neue&family=Anton&family=Playfair+Display:wght@800&family=Abril+Fatface&family=Lora:wght@700&family=Pacifico&family=Dancing+Script:wght@700&family=Lobster&family=Caveat:wght@700&family=Permanent+Marker&family=Fredoka:wght@600&family=Bangers&family=Righteous&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Arial,sans-serif;background:#f1f4fa;color:#1c2540}
+header{background:#1c2540;color:#fff;padding:14px 18px;font-weight:700;font-size:1.1rem}
+.app{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:18px}
+@media(min-width:900px){.app{grid-template-columns:400px 1fr;align-items:start}.stage{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}}
+.stage{text-align:center}
+#cv{width:100%;max-width:400px;aspect-ratio:2/3;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.2);background:#fff}
+button{font:600 1rem inherit;cursor:pointer}
+#dl{margin-top:12px;width:100%;max-width:400px;padding:14px;border:0;border-radius:999px;background:#1a73e8;color:#fff}
+.hint{font-size:.8rem;color:#5a6682;margin:6px 0 0;text-align:left}
+.panel{background:#fff;border-radius:14px;padding:6px 14px;box-shadow:0 4px 18px rgba(0,0,0,.06)}
+details{border-bottom:1px solid #e3e9f5;padding:10px 0}
+summary{font-weight:700;cursor:pointer;padding:4px 0}
+.row{display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;margin:10px 0;font-size:.9rem}
+.row.off{display:none}
+.row.head{font-weight:700}
+input[type=text],select{width:100%;padding:10px;border:1px solid #c9d4ea;border-radius:8px;font:inherit}
+input[type=color]{width:60px;height:38px;border:1px solid #c9d4ea;border-radius:8px;padding:2px;background:#fff}
+input[type=range]{width:100%}
+input[type=checkbox]{width:20px;height:20px}
+.bi{display:flex;gap:8px}
+.bi label{display:flex;align-items:center;gap:5px;border:1px solid #c9d4ea;border-radius:8px;padding:6px 12px;cursor:pointer}
+#tp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.tc{text-align:center;font-size:.72rem;color:#5a6682}
+.tc canvas{width:100%;aspect-ratio:2/3;border-radius:8px;border:3px solid transparent;cursor:pointer;display:block}
+.tc canvas.on{border-color:#1a73e8}
+#th{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+#th div{position:relative}
+#th img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid #c9d4ea;cursor:pointer}
+#th div:first-child img{border-color:#1a73e8}
+#th b{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#d33;color:#fff;text-align:center;line-height:22px;font-size:.8rem;cursor:pointer}
+.fl{display:block;padding:12px;border:2px dashed #1a73e8;border-radius:10px;text-align:center;color:#1a73e8;font-weight:600;cursor:pointer}
+.api{margin-top:14px;text-align:left;background:#fff;border-radius:12px;padding:6px 12px}
+.api pre{background:#0f172a;color:#d6e2ff;padding:10px;border-radius:8px;font-size:.72rem;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.api button{padding:8px 14px;border:0;border-radius:8px;background:#1c2540;color:#fff;font-size:.85rem}
+</style>
+</head>
+<body>
+<header>📌 Pin Maker</header>
+<main class="app">
+  <section class="stage">
+    <canvas id="cv" width="1000" height="1500" aria-label="Pin preview"></canvas>
+    <button id="dl">Download Pin (PNG)</button>
+    <p class="hint">Pin size 1000 × 1500 (2:3), the standard Pinterest ratio.</p>
+    <details class="api"><summary>Use this design with Make / the API</summary>
+      <p class="hint">POST this JSON to <b id="ep">/.netlify/functions/render-pin</b>. It re-creates the pin you are looking at (swap in your own title, description and imageUrl).</p>
+      <pre id="apijson"></pre><button id="cp">Copy JSON</button>
+    </details>
+  </section>
+  <section class="panel" id="panel">
+    <details open><summary>1. Choose a design</summary><div id="tp"></div></details>
+  </section>
+</main>
+<script src="pin-engine.js"></script>
+<script>
+const P=PinEngine,{BASE,RANGE,OPTS,FONTS,TPL,CONTENT}=P;
+const $=s=>document.querySelector(s),cv=$("#cv"),ins={},imgs=[],dirty=new Set(),S={...BASE,_ph:true,tpl:0};
+
+/* controls: [id,label,type,showOnlyWhen]. type: text | check | color | range | font | sel | bi (bold+italic) */
+const SEC=[
+["2. Photos",[["files"],["zoom","Photo zoom","range"],["ovOn","Darken photo","check"],["ov","Darkness","range","ovOn"],["pfOn","Photo frame / ring","check"],["pfc","Frame colour","color","pfOn"],["pfw","Frame thickness","range","pfOn"]]],
+["3. Title",[["tOn","Show title","check"],["title","Title","text","tOn"],["hl","Highlight words (colour 1)","text","tOn"],["hl2","Highlight words (colour 2)","text","tOn"],["caps","UPPERCASE title","check","tOn"],["t","Bold / italic (whole title)","bi","tOn"],
+ ["hint","Tip: type | for a new line, **double stars** around a word for bold, *single stars* for italic. Separate highlight words with spaces."]]],
+["4. Subtitle",[["sOn","Show subtitle","check"],["sub","Subtitle","text","sOn"],["shl","Highlight words","text","sOn"],["s","Bold / italic (whole subtitle)","bi","sOn"]]],
+["5. Fonts & size",[["f1","Title font","font"],["f2","Subtitle font","font"],["f3","Number font","font"],["tsize","Title size","range"],["ssize","Subtitle size","range"]]],
+["6. Text effects",[["outOn","Text outline","check"],["ocol","Outline colour","color","outOn"],["owid","Outline thickness","range","outOn"],["shOn","Text shadow","check"]]],
+["7. Text colours",[["tcol","Title colour","color"],["hcol","Highlight colour 1","color"],["h2col","Highlight colour 2","color"],["scol","Subtitle colour","color"],["shcol","Subtitle highlight","color"]]],
+["8. Text box & box line",[["boxOn","Show box (filled)","check"],["box","Box colour","color","boxOn"],["boxop","Box opacity","range","boxOn"],["boxr","Corner roundness","range","boxOn"],["lineOn","Show box line","check"],["linec","Box line colour","color","lineOn"],["linew","Box line thickness","range","lineOn"],["lgap","Line distance from edge","range","lineOn"]]],
+["9. Page border",[["borderOn","Show border","check"],["bcol","Border colour","color","borderOn"],["bwid","Border thickness","range","borderOn"],["bgap","Distance from edge","range","borderOn"],["bstyle","Border style","sel","borderOn"],["brad","Corner roundness","range","borderOn"]]],
+["10. Number badge",[["bgOn","Show badge / number","check"],["badge","Number or text","text","bgOn"],["bdst","Style","sel","bgOn"],["bds","Size","range","bgOn"],["bdc","Circle colour","color","bgOn"],["bdt","Number colour","color","bgOn"],["bdw","Ring thickness","range","bgOn"],["bdr","Ring colour","color","bgOn"],["n","Bold / italic","bi","bgOn"]]],
+["11. Button",[["btnOn","Show button","check"],["btn","Button text (| = 2 lines)","text","btnOn"],["bshape","Shape","sel","btnOn"],["bpos","Position","sel","btnOn"],["bbg","Button colour","color","btnOn"],["btc","Button text colour","color","btnOn"],["b","Bold / italic","bi","btnOn"]]],
+["12. Background",[["grad","Use gradient","check"],["c1","Colour 1","color"],["c2","Gradient colour 2","color","grad"],["ang","Gradient angle","range","grad"]]]
+];
+
+/* ---------- interface ---------- */
+const PN=$("#panel"),tp=$("#tp"),rows=[];
+TPL.forEach((t,i)=>{const d=document.createElement("div");d.className="tc";const c=document.createElement("canvas");c.width=200;c.height=300;c.title=t.name;c.setAttribute("role","button");c.setAttribute("aria-label",t.name+" design");
+ c.onclick=()=>pick(i);d.append(c,Object.assign(document.createElement("span"),{textContent:`${i+1}. ${t.name}`}));tp.append(d)});
+function sync(o){Object.assign(S,o);for(const k in o)if(ins[k]){const e=ins[k];e.type==="checkbox"?e.checked=S[k]:e.value=S[k];if(e._v)e._v.textContent=S[k]}vis()}
+function vis(){rows.forEach(([r,dep])=>r.classList.toggle("off",!!dep&&!S[dep]))}
+function pick(i){S.tpl=i;const o={...P.styleOf(i)};CONTENT.forEach(k=>{if(!dirty.has(k))o[k]=P.sampleOf(i,k)});sync(o);
+ document.querySelectorAll("#tp canvas").forEach((e,j)=>e.classList.toggle("on",j===i));render()}
+function bind(id,e,t){ins[id]=e;e.oninput=()=>{S[id]=t==="check"?e.checked:t==="range"?+e.value:e.value;if(e._v)e._v.textContent=e.value;if(CONTENT.includes(id))dirty.add(id);vis();render()}}
+SEC.forEach(([name,list])=>{const d=document.createElement("details");d.innerHTML=`<summary>${name}</summary>`;PN.append(d);
+ list.forEach(c=>{const[id,l,t,dep]=c;
+  if(id==="files"){d.insertAdjacentHTML("beforeend",`<label class="fl">📷 Add photos from your phone<input id="fi" type="file" accept="image/*" multiple hidden></label><p class="hint">First photo is used first. Tap a photo to make it first, × to remove.</p><div id="th"></div>`);return}
+  if(id==="hint"){d.insertAdjacentHTML("beforeend",`<p class="hint">${l.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")}</p>`);return}
+  const r=document.createElement("div");r.className="row";r.innerHTML=`<label for="c_${id}">${l}</label>`;let e;
+  if(t==="bi"){e=document.createElement("div");e.className="bi";[["B","<b>B</b>"],["I","<i>I</i>"]].forEach(([k,h])=>{const lb=document.createElement("label"),i=document.createElement("input");i.type="checkbox";i.id="c_"+id+k;lb.append(i);lb.insertAdjacentHTML("beforeend",h);e.append(lb);bind(id+k,i,"check")})}
+  else{
+   if(t==="font"||t==="sel"){e=document.createElement("select");(t==="font"?(id==="f3"?[""].concat(FONTS):FONTS):OPTS[id]).forEach(o=>e.add(new Option(o||"(same as title)",o)))}
+   else{e=document.createElement("input");e.type=t==="check"?"checkbox":t;if(t==="range"){e.min=RANGE[id][0];e.max=RANGE[id][1]}}
+   e.id="c_"+id;bind(id,e,t);
+   if(t==="range"){const o=document.createElement("small");e._v=o;r.append(e,o);r.style.gridTemplateColumns="140px 1fr 36px"}}
+  if(!r.contains(e))r.append(e);d.append(r);rows.push([r,dep])})});
+function thumbs(){const th=$("#th");th.innerHTML="";imgs.forEach((im,i)=>{const w=document.createElement("div"),m=new Image();m.src=im.src;m.alt="Photo "+(i+1);m.onclick=()=>{imgs.unshift(imgs.splice(i,1)[0]);thumbs();render()};const x=document.createElement("b");x.textContent="×";x.onclick=()=>{imgs.splice(i,1);thumbs();render()};w.append(m,x);th.append(w)})}
+$("#fi").onchange=e=>{[...e.target.files].forEach(f=>{const im=new Image();im.onload=()=>{imgs.push(im);thumbs();render()};im.src=URL.createObjectURL(f)});e.target.value=""};
+$("#dl").onclick=()=>{const s={...S,_ph:false};P.draw(cv.getContext("2d"),s,imgs,1,S.tpl);cv.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="pin.png";a.click();render()},"image/png")};
+
+/* ---------- drawing + API snippet ---------- */
+let pend=0;
+function render(){if(pend)return;pend=requestAnimationFrame(()=>{pend=0;P.draw(cv.getContext("2d"),S,imgs,1,S.tpl);
+ document.querySelectorAll("#tp canvas").forEach((c,i)=>{const x=c.getContext("2d"),s={...BASE,...P.styleOf(i),zoom:S.zoom,_ph:true};CONTENT.forEach(k=>s[k]=dirty.has(k)?S[k]:P.sampleOf(i,k));
+  x.clearRect(0,0,200,300);P.draw(x,i===S.tpl?S:s,imgs,.2,i)});api()})}
+function api(){const b=P.styleOf(S.tpl),o={};P.STYLE.forEach(k=>{if(S[k]!==b[k])o[k]=S[k]});
+ const body={title:S.title,description:S.sub,imageUrl:"https://example.com/your-photo.jpg",template:S.tpl+1};
+ [["highlight","hl"],["highlight2","hl2"],["subHighlight","shl"],["badge","badge"],["button","btn"]].forEach(([a,k])=>{if(S[k]&&S[k]!==(P.TPL[S.tpl].api||{})[k])body[a]=S[k]});
+ if(Object.keys(o).length)body.options=o;$("#apijson").textContent=JSON.stringify(body,null,2)}
+$("#ep").textContent=location.origin+"/.netlify/functions/render-pin";
+$("#cp").onclick=()=>navigator.clipboard.writeText($("#apijson").textContent).then(()=>{$("#cp").textContent="Copied ✓";setTimeout(()=>$("#cp").textContent="Copy JSON",1500)});
+
+pick(0);
+FONTS.forEach(f=>document.fonts.load(P.fw(f,40)).then(render));
+</script>
+</body>
+</html>

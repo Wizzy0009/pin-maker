@@ -1,0 +1,14 @@
+{
+  "name": "pin-maker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinterest pin maker + serverless render-pin API for Netlify",
+  "scripts": {
+    "build": "node scripts/prepare-fonts.mjs"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.60",
+    "@netlify/blobs": "^8.1.0"
+  }
+}

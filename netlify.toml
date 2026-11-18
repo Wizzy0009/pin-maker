@@ -1,0 +1,14 @@
+[build]
+  publish = "public"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # native module: must be shipped as-is, not bundled
+  external_node_modules = ["@napi-rs/canvas"]
+  # the TTF fonts downloaded by scripts/prepare-fonts.mjs
+  included_files = ["netlify/functions/fonts/**"]
